@@ -1,0 +1,35 @@
+name: windows-build
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.3'
+          arch: 'win64_msvc2019_64'
+          cache: true
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Automated tests
+        run: build\Release\banksim_tests.exe
+      - name: Package
+        shell: cmd
+        run: |
+          mkdir dist\BankSim
+          copy build\Release\BankSim.exe dist\BankSim\
+          copy build\Release\banksim_tests.exe dist\BankSim\
+          copy README.md dist\BankSim\
+          windeployqt --release --compiler-runtime --no-translations --no-system-d3d-compiler --no-opengl-sw dist\BankSim\BankSim.exe
+      - name: Smoke-test the packaged exe (offscreen tour)
+        shell: cmd
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: dist\BankSim\BankSim.exe --tour tour
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BankSim-windows
+          path: dist/BankSim
